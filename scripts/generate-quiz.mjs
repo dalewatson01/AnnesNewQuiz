@@ -9,7 +9,11 @@ const ROOT = new URL('..', import.meta.url).pathname;
 const config = JSON.parse(readFileSync(`${ROOT}quiz-config.json`, 'utf8'));
 const used = JSON.parse(readFileSync(`${ROOT}used-questions.json`, 'utf8'));
 const PROVIDER = (process.env.LLM_PROVIDER || 'gemini').toLowerCase();
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 5;
+// Wait longer between attempts: Gemini's free tier often returns 503
+// ("high demand") in bursts, so a patient retry usually lands.
+const RETRY_DELAY_MS = [60000, 120000, 180000, 240000];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function sydneyDate(d = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -160,6 +164,11 @@ console.log(`Headlines fetched: ${headlines.length}`);
 let set = null;
 let lastErrors = [];
 for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  if (attempt > 1) {
+    const waitMs = RETRY_DELAY_MS[attempt - 2] || 240000;
+    console.log(`Waiting ${waitMs / 1000}s before attempt ${attempt}...`);
+    await sleep(waitMs);
+  }
   const retryNotes = attempt > 1
     ? `\nYour previous attempt had these problems - fix all of them:\n${lastErrors.map((e) => `- ${e}`).join('\n')}\n`
     : '';
