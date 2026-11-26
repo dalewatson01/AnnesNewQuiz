@@ -10,6 +10,7 @@ on:
   schedule:
     # 19:30 UTC = 06:30 AEDT in summer, 05:30 AEST in winter,
     # so the questions are in place before the 7am email goes out.
+    - cron: '0 19 * * *'
     - cron: '30 19 * * *'
   workflow_dispatch:
 
