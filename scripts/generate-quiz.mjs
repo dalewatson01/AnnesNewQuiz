@@ -2,6 +2,8 @@
 // Reads quiz-config.json and used-questions.json from the repo root.
 // Provider: env LLM_PROVIDER ('gemini' default, or 'openai').
 // Keys come from env GEMINI_API_KEY / OPENAI_API_KEY (GitHub secrets).
+// If questions.json already holds today's set, exits without calling
+// the LLM, so repeat or backup runs are harmless.
 // Run: node scripts/generate-quiz.mjs
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -157,6 +159,18 @@ async function callLLM(prompt) {
   if (PROVIDER === 'openai') return callOpenAI(prompt);
   if (PROVIDER === 'gemini') return callGemini(prompt);
   throw new Error(`Unknown LLM_PROVIDER "${PROVIDER}" (use gemini or openai)`);
+}
+
+// If today's set is already in place (e.g. an earlier scheduled run
+// already wrote it), do nothing - keeps repeat runs harmless.
+try {
+  const existing = JSON.parse(readFileSync(`${ROOT}questions.json`, 'utf8'));
+  if (existing && existing.date === TODAY && Array.isArray(existing.questions) && existing.questions.length === 15) {
+    console.log(`Questions for ${TODAY} already exist - nothing to do.`);
+    process.exit(0);
+  }
+} catch {
+  // No usable questions.json yet - generate as normal.
 }
 
 const headlines = await fetchHeadlines();
