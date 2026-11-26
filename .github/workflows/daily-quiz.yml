@@ -1,0 +1,43 @@
+# Anne's Daily Quiz - automatic generation.
+# Runs daily at 19:30 UTC (06:30 AEDT / 05:30 AEST) and writes questions.json.
+# Needs a repository secret: GEMINI_API_KEY (free from Google AI Studio) or
+# OPENAI_API_KEY. Change LLM_PROVIDER below to switch provider.
+# Difficulty and category weights live in quiz-config.json.
+# Manual run: repo Actions tab -> Daily quiz -> Run workflow.
+name: Daily quiz
+
+on:
+  schedule:
+    # 19:30 UTC = 06:30 AEDT in summer, 05:30 AEST in winter,
+    # so the questions are in place before the 7am email goes out.
+    - cron: '30 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generate today's quiz
+        env:
+          LLM_PROVIDER: gemini
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node scripts/generate-quiz.mjs
+      - name: Commit today's quiz
+        run: |
+          git config user.name "Anne's Daily Quiz"
+          git config user.email "quiz@dalewatson01.github"
+          git add questions.json used-questions.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Daily quiz for $(TZ=Australia/Sydney date +%F)"
+            git push
+          fi
